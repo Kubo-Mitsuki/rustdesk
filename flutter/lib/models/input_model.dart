@@ -580,7 +580,11 @@ class InputModel {
       if (iosCapsLock) {
         lockModes |= (1 << capslock);
       }
-      // Ignore "NumLock/ScrollLock" on iOS for now.
+      // iOS cannot read NumLock, and the host treats a missing NumLock bit as
+      // "off" and turns NumLock off before every numpad key, so numpad digits
+      // arrive as End/Insert. iPad keyboards have no NumLock key, so always
+      // report it as on. ScrollLock is still ignored.
+      lockModes |= (1 << numlock);
     } else {
       if (HardwareKeyboard.instance.lockModesEnabled
           .contains(KeyboardLockMode.capsLock)) {
