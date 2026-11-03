@@ -597,7 +597,10 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                           ),
                   );
                   if (!isIOS) return body;
-                  return Stack(children: [body, _toolbarCorner()]);
+                  // expand: a loose Stack let the canvas shrink to nothing,
+                  // so the remote screen stayed black.
+                  return Stack(
+                      fit: StackFit.expand, children: [body, _toolbarCorner()]);
                 })
               ],
             )),
