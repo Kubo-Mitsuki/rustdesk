@@ -224,6 +224,8 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       trySyncClipboard();
+    } else {
+      gFFI.inputModel.stopIosKeyRepeat();
     }
   }
 

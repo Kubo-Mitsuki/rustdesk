@@ -434,6 +434,30 @@ class InputModel {
   var _fling = false;
   Timer? _flingTimer;
   final _flingBaseDelay = 30;
+
+  // iPadOS does not deliver key repeat events to Flutter, and Windows does not
+  // auto-repeat injected keys, so a held key must be repeated here.
+  Timer? _iosKeyRepeatTimer;
+  PhysicalKeyboardKey? _iosKeyRepeatKey;
+  static const _iosKeyRepeatDelay = Duration(milliseconds: 500);
+  static const _iosKeyRepeatInterval = Duration(milliseconds: 33);
+  // Last-resort stop in case a key-up is lost, so the host is not flooded.
+  static const _iosKeyRepeatMaxTicks = 30 * 1000 ~/ 33;
+  static final _iosNoRepeatKeys = <PhysicalKeyboardKey>{
+    PhysicalKeyboardKey.shiftLeft,
+    PhysicalKeyboardKey.shiftRight,
+    PhysicalKeyboardKey.controlLeft,
+    PhysicalKeyboardKey.controlRight,
+    PhysicalKeyboardKey.altLeft,
+    PhysicalKeyboardKey.altRight,
+    PhysicalKeyboardKey.metaLeft,
+    PhysicalKeyboardKey.metaRight,
+    PhysicalKeyboardKey.capsLock,
+    PhysicalKeyboardKey.numLock,
+    PhysicalKeyboardKey.fn,
+    PhysicalKeyboardKey.lang1,
+    PhysicalKeyboardKey.lang2,
+  };
   final _trackpadAdjustPeerLinux = 0.06;
   // This is an experience value.
   final _trackpadAdjustMacToWin = 2.50;
@@ -961,6 +985,7 @@ class InputModel {
           // Show repeat event be converted to "release+press" events?
           e is KeyDownEvent || e is KeyRepeatEvent,
           iosCapsLock);
+      if (isIOS) _updateIosKeyRepeat(e, iosCapsLock);
     } else {
       if (!isWeb && _tryDispatchFlutterShortcut(e)) return KeyEventResult.handled;
       _restoreFlutterShortcutModifiers(e, mapMode: false);
@@ -1241,6 +1266,38 @@ class InputModel {
     return null;
   }
 
+  void stopIosKeyRepeat() {
+    _iosKeyRepeatTimer?.cancel();
+    _iosKeyRepeatTimer = null;
+    _iosKeyRepeatKey = null;
+  }
+
+  void _updateIosKeyRepeat(KeyEvent e, bool iosCapsLock) {
+    if (e is KeyRepeatEvent || e is KeyUpEvent) {
+      // If iPadOS ever sends its own repeats, let them through instead of doubling.
+      if (e.physicalKey == _iosKeyRepeatKey) stopIosKeyRepeat();
+      return;
+    }
+    if (e is! KeyDownEvent) return;
+    stopIosKeyRepeat();
+    final key = e.physicalKey;
+    if (_iosNoRepeatKeys.contains(key)) return;
+    final character = e.character ?? '';
+    final usbHid = key.usbHidUsage & 0xFFFF;
+    _iosKeyRepeatKey = key;
+    _iosKeyRepeatTimer = Timer(_iosKeyRepeatDelay, () {
+      var ticks = 0;
+      _iosKeyRepeatTimer = Timer.periodic(_iosKeyRepeatInterval, (_) {
+        if (++ticks > _iosKeyRepeatMaxTicks ||
+            !HardwareKeyboard.instance.physicalKeysPressed.contains(key)) {
+          stopIosKeyRepeat();
+          return;
+        }
+        newKeyboardMode(character, usbHid, true, iosCapsLock);
+      });
+    });
+  }
+
   /// Send Key Event
   void newKeyboardMode(
       String character, int usbHid, bool down, bool iosCapsLock) {
@@ -1474,6 +1531,7 @@ class InputModel {
     // Fix status
     if (!enter) {
       resetModifiers();
+      stopIosKeyRepeat();
     }
     _relativeMouse.onEnterOrLeaveImage(enter);
     _flingTimer?.cancel();
