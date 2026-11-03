@@ -985,7 +985,18 @@ class InputModel {
           // Show repeat event be converted to "release+press" events?
           e is KeyDownEvent || e is KeyRepeatEvent,
           iosCapsLock);
-      if (isIOS) _updateIosKeyRepeat(e, iosCapsLock);
+      if (isIOS) {
+        _updateIosKeyRepeat(e, iosCapsLock);
+        // Windows ignores an injected Win+L, so ask the host to lock, the same
+        // as the "Insert Lock" menu item. The keys are still sent so that the
+        // lone Win press does not open the Start menu.
+        if (e is KeyDownEvent &&
+            e.physicalKey == PhysicalKeyboardKey.keyL &&
+            HardwareKeyboard.instance.isMetaPressed &&
+            keyboardPerm) {
+          bind.sessionLockScreen(sessionId: sessionId);
+        }
+      }
     } else {
       if (!isWeb && _tryDispatchFlutterShortcut(e)) return KeyEventResult.handled;
       _restoreFlutterShortcutModifiers(e, mapMode: false);
