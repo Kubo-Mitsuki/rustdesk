@@ -136,6 +136,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
     _physicalFocusNode.requestFocus();
     HardwareKeyboard.instance.addHandler(_handleLocalKeyEvent);
     gFFI.inputModel.listenToMouse(true);
+    _setIosPointerHidden(true);
     gFFI.qualityMonitorModel.checkShowQualityMonitor(sessionId);
     keyboardSubscription =
         keyboardVisibilityController.onChange.listen(onSoftKeyboardChanged);
@@ -197,6 +198,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
     super.dispose();
     gFFI.dialogManager.hideMobileActionsOverlay(store: false);
     gFFI.inputModel.listenToMouse(false);
+    _setIosPointerHidden(false);
     gFFI.imageModel.disposeImage();
     gFFI.cursorModel.disposeImages();
     await gFFI.invokeMethod("enable_soft_keyboard", true);
@@ -227,6 +229,14 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
     } else {
       gFFI.inputModel.stopIosKeyRepeat();
     }
+  }
+
+  // The remote PC's cursor is drawn on the page, so hide the iPad pointer while
+  // this page is open. Handled in ios/Runner/AppDelegate.swift.
+  static const _irisPointerChannel = MethodChannel('iris/pointer');
+  void _setIosPointerHidden(bool hidden) {
+    if (!isIOS) return;
+    _irisPointerChannel.invokeMethod('setHidden', hidden).catchError((_) {});
   }
 
   // For client side

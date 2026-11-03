@@ -2,8 +2,40 @@ import UIKit
 import Flutter
 import AVFoundation
 
+// Flutter cannot hide the iPad pointer (SystemMouseCursors.none has no effect on
+// iOS), so on the remote page the iPad pointer and the remote PC's cursor are
+// drawn on top of each other. The remote page asks to hide it over this channel.
+// Flutter tracks the pointer with a hover gesture recognizer, which keeps working
+// while the pointer style is hidden.
+class IrisPointerHider: NSObject, UIPointerInteractionDelegate {
+  private var hidden = false
+  private var interaction: UIPointerInteraction?
+
+  func attach(to controller: FlutterViewController) {
+    let interaction = UIPointerInteraction(delegate: self)
+    controller.view.addInteraction(interaction)
+    self.interaction = interaction
+    FlutterMethodChannel(name: "iris/pointer", binaryMessenger: controller.binaryMessenger)
+      .setMethodCallHandler { [weak self] call, result in
+        guard call.method == "setHidden", let hidden = call.arguments as? Bool else {
+          result(FlutterMethodNotImplemented)
+          return
+        }
+        self?.hidden = hidden
+        self?.interaction?.invalidate()
+        result(nil)
+      }
+  }
+
+  func pointerInteraction(_ interaction: UIPointerInteraction, styleFor region: UIPointerRegion) -> UIPointerStyle? {
+    return hidden ? UIPointerStyle.hidden() : nil
+  }
+}
+
 @main
 @objc class AppDelegate: FlutterAppDelegate {
+  private let pointerHider = IrisPointerHider()
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -24,6 +56,9 @@ import AVFoundation
   func sceneWillConnect(window: UIWindow?, launchURL: URL?) {
     self.window = window
     GeneratedPluginRegistrant.register(with: self)
+    if let controller = window?.rootViewController as? FlutterViewController {
+      pointerHider.attach(to: controller)
+    }
     var launchOptions: [UIApplication.LaunchOptionsKey: Any] = [:]
     if let launchURL = launchURL {
       launchOptions[.url] = launchURL
