@@ -82,11 +82,13 @@ jobs:
       # Iris changes are mostly Dart-only. Reuse the Rust static lib (which already
       # bundles the vcpkg libraries) while nothing outside flutter/ has changed;
       # this skips vcpkg (~9 min) and cargo (~4 min).
+      # The lib is cached from its own folder because rust-cache's post step
+      # prunes target/ before this cache is saved.
       - name: Cache rustdesk lib
         id: rustlib
         uses: actions/cache@v4
         with:
-          path: target/aarch64-apple-ios/release/liblibrustdesk.a
+          path: rustlib-cache/liblibrustdesk.a
           key: rustlib-ios-${{ env.RUST_VERSION }}-${{ hashFiles('**', '!.git/**', '!**/.git', '!flutter/**', '!.github/**', '!**/*.md') }}
 
       - name: Install flutter
@@ -160,6 +162,18 @@ jobs:
         with:
           name: liblibrustdesk.a
           path: target/aarch64-apple-ios/release/liblibrustdesk.a
+
+      - name: Keep or restore cached rustdesk lib
+        shell: bash
+        run: |
+          if [[ "${{ steps.rustlib.outputs.cache-hit }}" == "true" ]]; then
+            mkdir -p target/aarch64-apple-ios/release
+            cp rustlib-cache/liblibrustdesk.a target/aarch64-apple-ios/release/
+          else
+            mkdir -p rustlib-cache
+            cp target/aarch64-apple-ios/release/liblibrustdesk.a rustlib-cache/
+          fi
+          ls -l target/aarch64-apple-ios/release/liblibrustdesk.a
 
       - name: Build rustdesk
         shell: bash
