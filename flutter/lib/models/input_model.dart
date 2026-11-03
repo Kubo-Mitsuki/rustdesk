@@ -435,6 +435,11 @@ class InputModel {
   Timer? _flingTimer;
   final _flingBaseDelay = 30;
 
+  // 30 iPad pixels = one Windows wheel notch (120); a slow 3 px tick is 12,
+  // close to the 7.5 steps Pyuron sends when plugged into the PC directly.
+  static const _iosScrollWheelUnitsPerPixel = 4.0;
+  var _iosScrollUnsent = Offset.zero;
+
   // iPadOS does not deliver key repeat events to Flutter, and Windows does not
   // auto-repeat injected keys, so a held key must be repeated here.
   Timer? _iosKeyRepeatTimer;
@@ -2051,6 +2056,24 @@ class InputModel {
     if (e is PointerScrollEvent) {
       final rawDx = e.scrollDelta.dx;
       final rawDy = e.scrollDelta.dy;
+      if (isIOS && peerPlatform == kPeerPlatformWindows) {
+        // iPadOS reports mouse wheel scrolling in pixels (3 px per slow tick,
+        // tens of px when spun fast), but the code below sends only the sign,
+        // so every event became one full notch. Send the amount instead; the
+        // Windows host passes "trackpad" deltas through without multiplying
+        // by WHEEL_DELTA (120).
+        _iosScrollUnsent +=
+            Offset(-rawDx, -rawDy) * _iosScrollWheelUnitsPerPixel;
+        final x = _iosScrollUnsent.dx.truncate();
+        final y = _iosScrollUnsent.dy.truncate();
+        _iosScrollUnsent -= Offset(x.toDouble(), y.toDouble());
+        if (x != 0 || y != 0) {
+          bind.sessionSendMouse(
+              sessionId: sessionId,
+              msg: '{"type": "trackpad", "x": "$x", "y": "$y"}');
+        }
+        return;
+      }
       final dominantDelta = rawDx.abs() > rawDy.abs() ? rawDx.abs() : rawDy.abs();
       final isSmooth = dominantDelta < 1;
       final nowUs = DateTime.now().microsecondsSinceEpoch;
