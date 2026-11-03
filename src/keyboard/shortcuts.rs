@@ -285,9 +285,11 @@ fn action_available_on_platform(action: &str, platform: &str, is_wayland: bool) 
     let mobile = matches!(platform, "android" | "ios");
     match action {
         action_id::TOGGLE_RELATIVE_MOUSE_MODE => !mobile && !is_wayland,
+        // Iris: iOS uses TOGGLE_TOOLBAR to open the mobile bottom bar.
+        action_id::TOGGLE_TOOLBAR => platform != "android",
         action_id::TOGGLE_FULLSCREEN | action_id::SCREENSHOT | action_id::SWITCH_TAB_NEXT
         | action_id::SWITCH_TAB_PREV | action_id::CLOSE_TAB | action_id::SWITCH_SIDES
-        | action_id::TOGGLE_TOOLBAR | action_id::PIN_TOOLBAR | action_id::SWITCH_DISPLAY_ALL
+        | action_id::PIN_TOOLBAR | action_id::SWITCH_DISPLAY_ALL
         | action_id::TOGGLE_ENABLE_FILE_COPY_PASTE | action_id::KEYBOARD_MODE_MAP
         | action_id::KEYBOARD_MODE_TRANSLATE | action_id::KEYBOARD_MODE_LEGACY
         | action_id::TOGGLE_SHOW_MY_CURSOR | action_id::TOGGLE_ZOOM_CURSOR => !mobile,

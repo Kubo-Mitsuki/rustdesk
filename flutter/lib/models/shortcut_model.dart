@@ -211,7 +211,9 @@ class ShortcutModel {
       includeRelativeMouseModeShortcut:
           isDesktop && !(isLinux && bind.mainCurrentIsWayland()),
       includeTabShortcuts: isDesktop,
-      includeToolbarShortcut: desktopLayout,
+      // Iris: on iOS the shortcut opens the mobile bottom bar instead of the
+      // floating button (mobile/pages/remote_page.dart).
+      includeToolbarShortcut: desktopLayout || isIOS,
       includeCloseTabShortcut: isDesktop,
       includeSwitchSidesShortcut: isDesktop,
       includeRecordingShortcut: !isWeb && !isIOS,

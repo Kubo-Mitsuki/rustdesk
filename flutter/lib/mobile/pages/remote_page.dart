@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common/shared_state.dart';
@@ -162,6 +163,10 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
         // log a no-handler debug line if a user binds one.
         registerSessionShortcutActions(gFFI);
         _registerMobileChatShortcut();
+        if (isIOS) {
+          gFFI.shortcutModel.register(kShortcutActionToggleToolbar,
+              () => setState(() => _showBar = !_showBar));
+        }
         registerToolbarShortcuts(context, widget.id, gFFI);
       }
     });
@@ -501,7 +506,13 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final keyboardIsVisible =
         keyboardVisibilityController.isVisible && _showEdit;
-    final showActionButton = !_showBar || keyboardIsVisible || _showGestureHelp;
+    // On iOS the floating button covered the remote screen; the bar is opened
+    // with the "Toggle toolbar" shortcut or a long press on the top-left corner
+    // (_toolbarCorner). The button is still needed to close the soft keyboard
+    // and the gesture help.
+    final showActionButton = (!_showBar && !isIOS) ||
+        keyboardIsVisible ||
+        _showGestureHelp;
 
     return WillPopScope(
       onWillPop: () async {
@@ -558,7 +569,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
             () => getRawPointerAndKeyBody(Overlay(
               initialEntries: [
                 OverlayEntry(builder: (context) {
-                  return Container(
+                  final body = Container(
                     color: kColorCanvas,
                     child: isWebDesktop
                         ? getBodyForDesktopWithListener()
@@ -585,10 +596,40 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                             }),
                           ),
                   );
+                  if (!isIOS) return body;
+                  return Stack(children: [body, _toolbarCorner()]);
                 })
               ],
             )),
           )),
+    );
+  }
+
+  // Top-left was chosen because Windows puts nothing there (Start and "show
+  // desktop" are at the bottom, the close button at the top right) and the
+  // bottom corners are iPadOS corner-swipe gestures. Only a touch long press
+  // opens the bar; the Pyuron trackball is handled by the ancestor
+  // RawPointerMouseRegion, so mouse input in the corner still reaches the PC.
+  Widget _toolbarCorner() {
+    return Positioned(
+      left: 0,
+      top: 0,
+      width: 56,
+      height: 56,
+      child: RawGestureDetector(
+        behavior: HitTestBehavior.opaque,
+        gestures: {
+          LongPressGestureRecognizer:
+              GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
+            () => LongPressGestureRecognizer(
+                supportedDevices: {PointerDeviceKind.touch}),
+            (recognizer) => recognizer.onLongPress = () {
+              if (gFFI.ffiModel.waitForFirstImage.isTrue) return;
+              setState(() => _showBar = true);
+            },
+          ),
+        },
+      ),
     );
   }
 
