@@ -7,6 +7,7 @@ on:
   push:
     branches:
       - kubo/ios-build
+      - kubo/iris
 
 env:
   SCITER_RUST_VERSION: "1.75" # https://github.com/rustdesk/rustdesk/discussions/7503, also 1.78 has ABI change which causes our sciter version not working, https://blog.rust-lang.org/2024/03/30/i128-layout-update.html
@@ -36,7 +37,7 @@ env:
   VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
   VCPKG_CMAKE_VERSION: "4.3.0"
   ARMV7_VCPKG_COMMIT_ID: "6f29f12e82a8293156836ad81cc9bf5af41fe836" # 2025.01.13, got "/opt/artifacts/vcpkg/vcpkg: No such file or directory" with latest version
-  VERSION: "1.5.0"
+  VERSION: "1.5.1"
   NDK_VERSION: "r28c"
   #signing keys env variable checks
   ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
@@ -78,6 +79,16 @@ jobs:
         with:
           submodules: recursive
 
+      # Iris changes are mostly Dart-only. Reuse the Rust static lib (which already
+      # bundles the vcpkg libraries) while nothing outside flutter/ has changed;
+      # this skips vcpkg (~9 min) and cargo (~4 min).
+      - name: Cache rustdesk lib
+        id: rustlib
+        uses: actions/cache@v4
+        with:
+          path: target/aarch64-apple-ios/release/liblibrustdesk.a
+          key: rustlib-ios-${{ env.RUST_VERSION }}-${{ hashFiles('**', '!.git/**', '!**/.git', '!flutter/**', '!.github/**', '!**/*.md') }}
+
       - name: Install flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
@@ -92,12 +103,14 @@ jobs:
           fi
 
       - name: Setup vcpkg with Github Actions binary cache
+        if: steps.rustlib.outputs.cache-hit != 'true'
         uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2 # v11
         with:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
           doNotCache: false
 
       - name: Install vcpkg dependencies
+        if: steps.rustlib.outputs.cache-hit != 'true'
         run: |
           if ! $VCPKG_ROOT/vcpkg \
             install \
@@ -116,13 +129,15 @@ jobs:
         shell: bash
 
       - name: Install Rust toolchain
+        if: steps.rustlib.outputs.cache-hit != 'true'
         uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
         with:
           toolchain: ${{ env.RUST_VERSION }}
           targets: ${{ matrix.job.target }}
           components: "rustfmt"
 
-      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - if: steps.rustlib.outputs.cache-hit != 'true'
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           prefix-key: rustdesk-lib-cache-ios
           key: ${{ matrix.job.target }}
@@ -134,11 +149,13 @@ jobs:
           path: ./
 
       - name: Build rustdesk lib
+        if: steps.rustlib.outputs.cache-hit != 'true'
         run: |
           rustup target add ${{ matrix.job.target }}
           cargo build --locked --features flutter,hwcodec --release --target aarch64-apple-ios --lib
           
       - name: Upload liblibrustdesk.a Artifacts
+        if: steps.rustlib.outputs.cache-hit != 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: liblibrustdesk.a

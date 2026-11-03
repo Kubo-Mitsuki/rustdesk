@@ -1,4 +1,4 @@
-> **Modified version (Iris).** This repository is a personal modification of [RustDesk](https://github.com/rustdesk/rustdesk) 1.5.0 by Kubo-Mitsuki, started 2026-11. It is not affiliated with or endorsed by the RustDesk project. Licensed under AGPL-3.0 (see `LICENCE`), same as upstream.
+> **Modified version (Iris).** This repository is a personal modification of [RustDesk](https://github.com/rustdesk/rustdesk) 1.5.1 by Kubo-Mitsuki, started 2026-11. It is not affiliated with or endorsed by the RustDesk project. Licensed under AGPL-3.0 (see `LICENCE`), same as upstream.
 
 <p align="center">
   <img src="res/logo-header.svg" alt="RustDesk - Your remote desktop"><br>
