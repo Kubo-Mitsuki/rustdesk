@@ -1399,15 +1399,7 @@ fn _map_keyboard_mode(_peer: &str, event: &Event, mut key_event: KeyEvent) -> Op
     };
     #[cfg(any(target_os = "android", target_os = "ios"))]
     let keycode = match _peer {
-        // Iris: rdev maps LANG1/LANG2 to scancodes 0xF2/0xF1 without the E0
-        // prefix, so the host injects them as non-extended keys and Windows
-        // sees an unknown key. A keyboard plugged into Windows delivers them as
-        // extended 0xF2/0xF1, which Windows turns into VK_IME_ON/VK_IME_OFF.
-        OS_LOWER_WINDOWS => match event.usb_hid {
-            0x90 => 0xE0F2,
-            0x91 => 0xE0F1,
-            _ => rdev::usb_hid_code_to_win_scancode(event.usb_hid as _)?,
-        },
+        OS_LOWER_WINDOWS => rdev::usb_hid_code_to_win_scancode(event.usb_hid as _)?,
         OS_LOWER_LINUX => rdev::usb_hid_code_to_linux_code(event.usb_hid as _)?,
         OS_LOWER_MACOS => {
             if hbb_common::config::LocalConfig::get_kb_layout_type() == "ISO" {
