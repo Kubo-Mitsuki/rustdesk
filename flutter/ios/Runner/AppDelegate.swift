@@ -32,6 +32,16 @@ class IrisPointerHider: NSObject, UIPointerInteractionDelegate {
   }
 }
 
+// In iPadOS windowed mode, a drag near the top edge moves the iPad window, so dragging
+// a remote PC window by its title bar moved Iris instead. Deferring the top edge asks
+// the system to let the app see the touch first (Moonlight does the same for all edges).
+// Only the top: deferring the bottom would make going home take two swipes.
+class IrisViewController: FlutterViewController {
+  override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge {
+    return .top
+  }
+}
+
 @main
 @objc class AppDelegate: FlutterAppDelegate {
   private let pointerHider = IrisPointerHider()
