@@ -995,10 +995,15 @@ class InputModel {
         // Windows ignores an injected Win+L, so ask the host to lock, the same
         // as the "Insert Lock" menu item. The keys are still sent so that the
         // lone Win press does not open the Start menu.
+        // The swap happens later in Rust, so with it on the key that reaches
+        // the PC as Win is the one the iPad reports as Control.
         if (e is KeyDownEvent &&
             e.physicalKey == PhysicalKeyboardKey.keyL &&
-            HardwareKeyboard.instance.isMetaPressed &&
-            keyboardPerm) {
+            keyboardPerm &&
+            (bind.sessionGetToggleOptionSync(
+                    sessionId: sessionId, arg: 'allow_swap_key')
+                ? HardwareKeyboard.instance.isControlPressed
+                : HardwareKeyboard.instance.isMetaPressed)) {
           bind.sessionLockScreen(sessionId: sessionId);
         }
       }

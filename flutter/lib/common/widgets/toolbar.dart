@@ -1330,8 +1330,11 @@ List<TToggleMenu> toolbarKeyboardToggles(FFI ffi) {
   List<TToggleMenu> v = [];
 
   // swap key
+  // iPad is Command-based like macOS, so offer the swap toward non-Mac peers too:
+  // with it on, iPad Command+C becomes Ctrl+C on the PC, and a keyboard whose
+  // Ctrl sends Command gets the same copy/paste on the iPad and in the session.
   if (ffiModel.keyboard &&
-      ((isMacOS && pi.platform != kPeerPlatformMacOS) ||
+      (((isMacOS || isIOS) && pi.platform != kPeerPlatformMacOS) ||
           (!isMacOS && pi.platform == kPeerPlatformMacOS))) {
     final option = 'allow_swap_key';
     final value =
