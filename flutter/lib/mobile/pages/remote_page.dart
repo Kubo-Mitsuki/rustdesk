@@ -103,7 +103,8 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
   final FocusNode _mobileFocusNode = FocusNode();
   final FocusNode _physicalFocusNode = FocusNode();
   var _showEdit = false; // use soft keyboard
-  var _irisKb = false; // Iris on-screen keyboard (Pyuron layout)
+  IrisLayout? _irisKb; // Iris on-screen keyboard shown, and which layout
+  var _irisNumpad = false; // numpad next to the QWERTY layout
 
   Worker? _waylandKeyboardGateWorker;
   bool _waylandKeyboardGateInitialized = false;
@@ -622,16 +623,25 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
       final mq = MediaQuery.of(context);
       final barH = (mq.size.height - constraints.maxHeight).clamp(0.0, 400.0).toDouble();
       const pad = 0.0;
-      final kbH = _irisKb ? irisKeyboardHeight(mq.size, pad) : 0.0;
+      final layout = _irisKb;
+      final kbH = layout == null
+          ? 0.0
+          : irisKeyboardHeight(mq.size, pad, layout, numpad: _irisNumpad);
       _syncIrisKeyboardHeight(kbH + barH);
-      if (!_irisKb) return page;
+      if (layout == null) return page;
       return Stack(fit: StackFit.expand, children: [
         page,
         Positioned(
           left: 0,
           right: 0,
           bottom: 0,
-          child: IrisKeyboard(inputModel: inputModel, bottomPad: pad),
+          child: IrisKeyboard(
+            inputModel: inputModel,
+            layout: layout,
+            bottomPad: pad,
+            numpad: _irisNumpad,
+            onToggleNumpad: () => setState(() => _irisNumpad = !_irisNumpad),
+          ),
         ),
       ]);
     });
@@ -741,15 +751,23 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                                   color: Colors.white,
                                   icon: Icon(Icons.keyboard),
                                   onPressed: openKeyboard),
+                              // One button per layout (2026-11-16); pressing
+                              // the shown layout's button hides it.
                               if (isIOS)
-                                IconButton(
-                                  color: Colors.white,
-                                  icon: Icon(_irisKb
-                                      ? Icons.keyboard_hide
-                                      : Icons.keyboard_alt_outlined),
-                                  onPressed: () =>
-                                      setState(() => _irisKb = !_irisKb),
-                                ),
+                                for (final l in IrisLayout.values)
+                                  TextButton(
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.white,
+                                      backgroundColor: _irisKb == l
+                                          ? Colors.white24
+                                          : null,
+                                    ),
+                                    onPressed: () => setState(() =>
+                                        _irisKb = _irisKb == l ? null : l),
+                                    child: Text(l == IrisLayout.pyuron
+                                        ? 'Pyuron'
+                                        : 'QWERTY'),
+                                  ),
                               IconButton(
                                 color: Colors.white,
                                 icon: Icon(gFFI.ffiModel.touchMode
