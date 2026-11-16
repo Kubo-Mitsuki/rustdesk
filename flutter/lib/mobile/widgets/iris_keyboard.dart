@@ -313,7 +313,7 @@ class _IrisKeyboardState extends State<IrisKeyboard> {
     final keySize = pitch - gap;
     final halfW = 6 * pitch - gap;
     final height = irisKeyboardHeight(size, widget.bottomPad);
-    final fontSize = (keySize * 0.34).clamp(10.0, 17.0);
+    final fontSize = (keySize * 0.34).clamp(10.0, 17.0).toDouble();
 
     final keys = <Widget>[];
     for (var i = 0; i < _pos.length; i++) {
@@ -345,12 +345,13 @@ class _IrisKeyboardState extends State<IrisKeyboard> {
   }
 
   Widget _key(int i, _Colors col, double fontSize) {
-    final layerAction = _layer != 0 ? _layers[_layer]?[i] : null;
+    final layerList = _layers[_layer]; // null for the base layer
+    final layerAction = layerList == null ? null : layerList[i];
     final a = layerAction ?? _base[i]!;
     final dimmed = _layer != 0 && layerAction == null && _held != i;
     final label = a.label;
     final isMod = label != 'Space' &&
-        (label.characters.length > 1 || '←↑↓→'.contains(label));
+        (label.runes.length > 1 || '←↑↓→'.contains(label));
     final down = _down.contains(i);
     final bg = down
         ? (isMod ? col.key : col.press)
@@ -379,7 +380,7 @@ class _IrisKeyboardState extends State<IrisKeyboard> {
               Text(label,
                   style: TextStyle(
                       color: col.fg,
-                      fontSize: label.characters.length > 2 ? fontSize * 0.78 : fontSize,
+                      fontSize: label.runes.length > 2 ? fontSize * 0.78 : fontSize,
                       height: 1.05)),
               if (sub != null)
                 Text(sub,
