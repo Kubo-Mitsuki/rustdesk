@@ -2252,6 +2252,9 @@ class CanvasModel with ChangeNotifier {
   // remote id
   String id = '';
   late final SessionID sessionId;
+  // Iris: height of the on-screen keyboard panel at the bottom (0 when hidden),
+  // so the remote screen is fitted above it instead of under it.
+  double irisKeyboardHeight = 0;
   // scroll offset x percent
   double _scrollX = 0.0;
   // scroll offset y percent
@@ -2349,7 +2352,8 @@ class CanvasModel with ChangeNotifier {
       h = h -
           mediaData.viewInsets.bottom -
           (parent.target?.cursorModel.keyHelpToolsRectToAdjustCanvas?.bottom ??
-              0);
+              0) -
+          irisKeyboardHeight;
       // Orientation-specific handling:
       //  - Portrait: additionally subtract top padding (e.g. status bar / notch)
       //  - Landscape: does not subtract mediaData.padding.top/bottom (home indicator auto-hides)

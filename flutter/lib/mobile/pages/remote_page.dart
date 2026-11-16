@@ -9,6 +9,7 @@ import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/mobile/widgets/floating_mouse.dart';
 import 'package:flutter_hbb/mobile/widgets/floating_mouse_widgets.dart';
 import 'package:flutter_hbb/mobile/widgets/gesture_help.dart';
+import 'package:flutter_hbb/mobile/widgets/iris_keyboard.dart';
 import 'package:flutter_hbb/models/chat_model.dart';
 import 'package:flutter_keyboard_visibility/flutter_keyboard_visibility.dart';
 import 'package:flutter_svg/svg.dart';
@@ -102,6 +103,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
   final FocusNode _mobileFocusNode = FocusNode();
   final FocusNode _physicalFocusNode = FocusNode();
   var _showEdit = false; // use soft keyboard
+  var _irisKb = false; // Iris on-screen keyboard (Pyuron layout)
 
   Worker? _waylandKeyboardGateWorker;
   bool _waylandKeyboardGateInitialized = false;
@@ -565,7 +567,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                       : Offstage(),
                 ],
               )),
-          body: Obx(
+          body: _withIrisKeyboard(Obx(
             () => getRawPointerAndKeyBody(Overlay(
               initialEntries: [
                 OverlayEntry(builder: (context) {
@@ -604,8 +606,41 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                 })
               ],
             )),
-          )),
+          ))),
     );
+  }
+
+  // The keyboard sits outside the Overlay: an OverlayEntry does not rebuild on
+  // this page's setState, and outside RawPointerMouseRegion its touches are not
+  // also treated as remote pointer input.
+  Widget _withIrisKeyboard(Widget page) {
+    if (!isIOS) return page;
+    _syncIrisKeyboardHeight(context);
+    if (!_irisKb) return page;
+    return Stack(fit: StackFit.expand, children: [
+      page,
+      Positioned(
+        left: 0,
+        right: 0,
+        bottom: 0,
+        child: IrisKeyboard(
+          inputModel: inputModel,
+          bottomPad: MediaQuery.of(context).padding.bottom,
+          onHide: () => setState(() => _irisKb = false),
+        ),
+      ),
+    ]);
+  }
+
+  // The remote screen is fitted into the space above the Iris keyboard. The
+  // height depends on the orientation, so it is checked on every build.
+  void _syncIrisKeyboardHeight(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final h = _irisKb ? irisKeyboardHeight(mq.size, mq.padding.bottom) : 0.0;
+    if (gFFI.canvasModel.irisKeyboardHeight == h) return;
+    gFFI.canvasModel.irisKeyboardHeight = h;
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => gFFI.canvasModel.updateViewStyle());
   }
 
   // Top-left was chosen because Windows puts nothing there (Start and "show
@@ -702,6 +737,15 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                                   color: Colors.white,
                                   icon: Icon(Icons.keyboard),
                                   onPressed: openKeyboard),
+                              if (isIOS)
+                                IconButton(
+                                  color: Colors.white,
+                                  icon: Icon(_irisKb
+                                      ? Icons.keyboard_hide
+                                      : Icons.keyboard_alt_outlined),
+                                  onPressed: () =>
+                                      setState(() => _irisKb = !_irisKb),
+                                ),
                               IconButton(
                                 color: Colors.white,
                                 icon: Icon(gFFI.ffiModel.touchMode
