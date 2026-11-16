@@ -528,20 +528,15 @@ class _RawTouchGestureDetectorRegionState
 
   get onHoldDragCancel => null;
 
-  // Iris: cursor acceleration from the RemoTrackpad design notes (appendix
-  // 4-2): gain = min(3, 0.55 + speed[pt/ms] * 0.9), times the speed setting
-  // that Kubo chose as "normal" (0.8) in the keyboard trial.
-  static const _cursorSpeed = 0.8;
   int _lastPanUs = 0;
 
   void _resetPanClock() => _lastPanUs = DateTime.now().microsecondsSinceEpoch;
 
   Offset _accelerate(Offset delta) {
     final now = DateTime.now().microsecondsSinceEpoch;
-    final dtMs = max(1.0, (now - _lastPanUs) / 1000.0);
+    final dtMs = (now - _lastPanUs) / 1000.0;
     _lastPanUs = now;
-    final gain = min(3.0, 0.55 + delta.distance / dtMs * 0.9) * _cursorSpeed;
-    return delta * gain;
+    return InputModel.irisAccelerate(delta, dtMs);
   }
 
   // Iris: three fingers drag (left button held). The button goes down only

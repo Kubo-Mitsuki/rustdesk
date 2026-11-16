@@ -1504,6 +1504,21 @@ class InputModel {
             .encode(modify({'id': id, 'type': 'wheel', 'y': y.toString()})));
   }
 
+  // Iris: cursor acceleration from the RemoTrackpad design notes (appendix
+  // 4-2): gain = min(3, 0.55 + speed[pt/ms] * 0.9), times the speed setting
+  // that Kubo chose as "normal" (0.8) in the keyboard trial.
+  static const _irisCursorSpeed = 0.8;
+  static Offset irisAccelerate(Offset delta, double dtMs) {
+    final speed = delta.distance / max(1.0, dtMs);
+    return delta * (min(3.0, 0.55 + speed * 0.9) * _irisCursorSpeed);
+  }
+
+  /// Iris: move the PC cursor by [delta] iPad points, as the mouse-mode finger
+  /// does (relative, whatever the touch mode setting is).
+  Future<void> irisMoveCursor(Offset delta) async {
+    await parent.target?.cursorModel.updatePan(delta, Offset.zero, false);
+  }
+
   var _touchScrollUnsent = Offset.zero;
 
   /// Two-finger scroll on the iPad screen, natural direction (content follows

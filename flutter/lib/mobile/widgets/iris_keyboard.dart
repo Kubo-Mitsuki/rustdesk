@@ -362,6 +362,22 @@ class _IrisKeyboardState extends State<_PyuronKeyboard> {
         child: _key(i, col, fontSize),
       ));
     }
+    // Pyuron's trackballs sit between the 2nd and 3rd thumb keys of each half
+    // (prototype, 2026-11-13): left scrolls, right moves the cursor.
+    final ball = keySize * 0.78;
+    final ballTop = margin + 3 * pitch + keySize / 2 - ball / 2;
+    final inHalf = 2.5 * pitch + keySize / 2 - ball / 2;
+    for (final right in [false, true]) {
+      final halfLeft = right ? size.width - margin - halfW : margin;
+      keys.add(Positioned(
+        left: halfLeft + inHalf,
+        top: ballTop,
+        width: ball,
+        height: ball,
+        child: _IrisBall(
+            input: _input, cursor: right, colors: col, fontSize: fontSize),
+      ));
+    }
     // Opaque so touches between the keys do not reach the remote screen below.
     return Listener(
       behavior: HitTestBehavior.opaque,
@@ -423,6 +439,78 @@ class _IrisKeyboardState extends State<_PyuronKeyboard> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// A trackball drawn as a round pad: dragging a finger on it moves the cursor
+// (with the same acceleration as the screen) or scrolls the PC.
+class _IrisBall extends StatefulWidget {
+  final InputModel input;
+  final bool cursor; // false: scroll
+  final _Colors colors;
+  final double fontSize;
+  const _IrisBall(
+      {Key? key,
+      required this.input,
+      required this.cursor,
+      required this.colors,
+      required this.fontSize})
+      : super(key: key);
+
+  @override
+  State<_IrisBall> createState() => _IrisBallState();
+}
+
+class _IrisBallState extends State<_IrisBall> {
+  // The prototype scrolled 1.5 px per pt on the ball and 1.2 with two fingers.
+  static const _scrollRatio = 1.25;
+  int? _pointer;
+  Offset _last = Offset.zero;
+  Duration _lastTime = Duration.zero;
+
+  void _move(PointerMoveEvent e) {
+    if (e.pointer != _pointer) return;
+    final d = e.position - _last;
+    final dtMs = (e.timeStamp - _lastTime).inMicroseconds / 1000.0;
+    _last = e.position;
+    _lastTime = e.timeStamp;
+    if (widget.cursor) {
+      widget.input.irisMoveCursor(InputModel.irisAccelerate(d, dtMs));
+    } else {
+      widget.input.touchScroll(d * _scrollRatio);
+    }
+  }
+
+  void _end(PointerEvent e) {
+    if (e.pointer != _pointer) return;
+    setState(() => _pointer = null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final col = widget.colors;
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (e) {
+        if (_pointer != null) return;
+        setState(() => _pointer = e.pointer);
+        _last = e.position;
+        _lastTime = e.timeStamp;
+      },
+      onPointerMove: _move,
+      onPointerUp: _end,
+      onPointerCancel: _end,
+      child: Container(
+        decoration: BoxDecoration(
+          color: _pointer != null ? col.press : col.mod,
+          shape: BoxShape.circle,
+          boxShadow: [BoxShadow(color: col.shadow, offset: const Offset(0, 1))],
+        ),
+        alignment: Alignment.center,
+        child: Text(widget.cursor ? 'Cursor' : 'Scroll',
+            style: TextStyle(color: col.fg, fontSize: widget.fontSize * 0.7)),
       ),
     );
   }
