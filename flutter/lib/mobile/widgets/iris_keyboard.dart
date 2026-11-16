@@ -17,7 +17,7 @@ import '../../models/platform_model.dart';
 const double _ptPerMm = 132 / 25.4; // iPad Air 11: 132 pt per inch
 const double _marginMm = 3; // screen edge and the gap between the halves
 const double _gapMm = 1.2; // between keys
-const double _landscapePitchMm = 15.5; // decided 2026-11-13
+const double _landscapePitchMm = 16; // 15.5 on 2026-11-13, 16 on 2026-11-16
 // Shorter than Pyuron's 200 ms so the layer shows sooner (2026-11-15).
 const Duration _holdDelay = Duration(milliseconds: 150);
 

@@ -615,12 +615,13 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
   // also treated as remote pointer input.
   Widget _withIrisKeyboard(Widget page) {
     if (!isIOS) return page;
-    // The body is shorter than the screen while the bottom bar is shown; the
-    // bar then also covers the safe area, so the keyboard needs no padding.
+    // The body is shorter than the screen while the bottom bar is shown.
+    // No padding for the home indicator: the keys are only tapped, never
+    // swiped up, so the bottom margin is the same 3 mm as the sides (2026-11-16).
     return LayoutBuilder(builder: (context, constraints) {
       final mq = MediaQuery.of(context);
       final barH = (mq.size.height - constraints.maxHeight).clamp(0.0, 400.0).toDouble();
-      final pad = barH > 0 ? 0.0 : mq.padding.bottom;
+      const pad = 0.0;
       final kbH = _irisKb ? irisKeyboardHeight(mq.size, pad) : 0.0;
       _syncIrisKeyboardHeight(kbH + barH);
       if (!_irisKb) return page;
