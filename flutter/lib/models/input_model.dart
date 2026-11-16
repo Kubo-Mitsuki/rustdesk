@@ -1504,6 +1504,35 @@ class InputModel {
             .encode(modify({'id': id, 'type': 'wheel', 'y': y.toString()})));
   }
 
+  var _touchScrollUnsent = Offset.zero;
+
+  /// Two-finger scroll on the iPad screen, natural direction (content follows
+  /// the fingers). [touchDelta] is in iPad points.
+  Future<void> touchScroll(Offset touchDelta) async {
+    if (isViewCamera) return;
+    if (peerPlatform == kPeerPlatformWindows) {
+      // Same units as the iPad mouse wheel path; fingers moving up equal a
+      // wheel turned down, so the touch delta keeps its sign here.
+      _touchScrollUnsent += touchDelta * _iosScrollWheelUnitsPerPixel;
+      final x = _touchScrollUnsent.dx.truncate();
+      final y = _touchScrollUnsent.dy.truncate();
+      _touchScrollUnsent -= Offset(x.toDouble(), y.toDouble());
+      if (x != 0 || y != 0) {
+        await bind.sessionSendMouse(
+            sessionId: sessionId,
+            msg: '{"type": "trackpad", "x": "$x", "y": "$y"}');
+      }
+      return;
+    }
+    // Other hosts only take whole notches: one notch per 30 points.
+    _touchScrollUnsent += touchDelta / 30;
+    final notches = _touchScrollUnsent.dy.truncate();
+    if (notches != 0) {
+      _touchScrollUnsent = Offset(0, _touchScrollUnsent.dy - notches);
+      await scroll(notches);
+    }
+  }
+
   /// Reset key modifiers to false, including [shift], [ctrl], [alt] and [command].
   void resetModifiers() {
     shift = ctrl = alt = command = false;

@@ -90,7 +90,6 @@ class _RawTouchGestureDetectorRegionState
   Offset _cacheLongPressPosition = Offset(0, 0);
   // Timestamp of the last long press event.
   int _cacheLongPressPositionTs = 0;
-  double _mouseScrollIntegral = 0; // mouse scroll speed controller
   double _scale = 1;
 
   // Workaround tap down event when two fingers are used to scale(mobile)
@@ -329,6 +328,7 @@ class _RawTouchGestureDetectorRegionState
     }
     if (!handleTouch) {
       if (isSpecialHoldDragActive) return;
+      _resetPanClock();
       await inputModel.sendMouse('down', MouseButtons.left);
     }
   }
@@ -339,7 +339,8 @@ class _RawTouchGestureDetectorRegionState
     }
     if (!handleTouch) {
       if (isSpecialHoldDragActive) return;
-      await ffi.cursorModel.updatePan(d.delta, d.localPosition, handleTouch);
+      await ffi.cursorModel
+          .updatePan(_accelerate(d.delta), d.localPosition, handleTouch);
     }
   }
 
@@ -392,6 +393,7 @@ class _RawTouchGestureDetectorRegionState
       }
       await ffi.cursorModel.move(d.localPosition.dx, d.localPosition.dy);
     } else {
+      _resetPanClock();
       final offset = ffi.cursorModel.offset;
       final cursorX = offset.dx;
       final cursorY = offset.dy;
@@ -418,7 +420,8 @@ class _RawTouchGestureDetectorRegionState
     if (inputModel.relativeMouseMode.value) {
       await inputModel.sendMobileRelativeMouseMove(d.delta.dx, d.delta.dy);
     } else {
-      await ffi.cursorModel.updatePan(d.delta, d.localPosition, handleTouch);
+      final delta = handleTouch ? d.delta : _accelerate(d.delta);
+      await ffi.cursorModel.updatePan(delta, d.localPosition, handleTouch);
     }
   }
 
@@ -472,6 +475,13 @@ class _RawTouchGestureDetectorRegionState
       return;
     }
 
+    if (isMobile) {
+      // Iris: two fingers scroll the PC; the iPad view never zooms or pans
+      // (the PC display mode already matches the iPad screen).
+      await inputModel.touchScroll(d.focalPointDelta);
+      return;
+    }
+
     if (canvasLocked) return;
 
     if ((isDesktop || isWebDesktop)) {
@@ -517,18 +527,62 @@ class _RawTouchGestureDetectorRegionState
   }
 
   get onHoldDragCancel => null;
-  get onThreeFingerVerticalDragUpdate => ffi.ffiModel.isPeerAndroid
-      ? null
-      : (d) {
-          _mouseScrollIntegral += d.delta.dy / 4;
-          if (_mouseScrollIntegral > 1) {
-            inputModel.scroll(1);
-            _mouseScrollIntegral = 0;
-          } else if (_mouseScrollIntegral < -1) {
-            inputModel.scroll(-1);
-            _mouseScrollIntegral = 0;
-          }
-        };
+
+  // Iris: cursor acceleration from the RemoTrackpad design notes (appendix
+  // 4-2): gain = min(3, 0.55 + speed[pt/ms] * 0.9), times the speed setting
+  // that Kubo chose as "normal" (0.8) in the keyboard trial.
+  static const _cursorSpeed = 0.8;
+  int _lastPanUs = 0;
+
+  void _resetPanClock() => _lastPanUs = DateTime.now().microsecondsSinceEpoch;
+
+  Offset _accelerate(Offset delta) {
+    final now = DateTime.now().microsecondsSinceEpoch;
+    final dtMs = max(1.0, (now - _lastPanUs) / 1000.0);
+    _lastPanUs = now;
+    final gain = min(3.0, 0.55 + delta.distance / dtMs * 0.9) * _cursorSpeed;
+    return delta * gain;
+  }
+
+  // Iris: three fingers drag (left button held). The button goes down only
+  // after the fingers have moved 8 pt, so a resting third finger does not
+  // click.
+  static const _threeFingerDragSlop = 8.0;
+  double _threeFingerTravel = 0;
+  bool _threeFingerDown = false;
+  // The recognizer keeps sending three-finger updates for 200 ms after a
+  // finger is lifted; they must not press the button again.
+  bool _threeFingerActive = false;
+
+  onThreeFingerDragStart(DragStartDetails d) {
+    _threeFingerTravel = 0;
+    _threeFingerDown = false;
+    _threeFingerActive = true;
+    _resetPanClock();
+  }
+
+  onThreeFingerDragUpdate(DragUpdateDetails d) async {
+    if (isNotTouchBasedDevice() || !_threeFingerActive) return;
+    if (!_threeFingerDown) {
+      _threeFingerTravel += d.delta.distance;
+      if (_threeFingerTravel < _threeFingerDragSlop) {
+        _resetPanClock();
+        return;
+      }
+      _threeFingerDown = true;
+      await inputModel.sendMouse('down', MouseButtons.left);
+    }
+    await ffi.cursorModel
+        .updatePan(_accelerate(d.delta), d.localPosition, handleTouch);
+  }
+
+  onThreeFingerDragEnd(DragEndDetails d) async {
+    _threeFingerActive = false;
+    if (_threeFingerDown) {
+      _threeFingerDown = false;
+      await inputModel.sendMouse('up', MouseButtons.left);
+    }
+  }
 
   makeGestures(BuildContext context) {
     return <Type, GestureRecognizerFactory>{
@@ -585,7 +639,9 @@ class _RawTouchGestureDetectorRegionState
           ..onTwoFingerScaleStart = onTwoFingerScaleStart
           ..onTwoFingerScaleUpdate = onTwoFingerScaleUpdate
           ..onTwoFingerScaleEnd = onTwoFingerScaleEnd
-          ..onThreeFingerVerticalDragUpdate = onThreeFingerVerticalDragUpdate;
+          ..onThreeFingerVerticalDragStart = onThreeFingerDragStart
+          ..onThreeFingerVerticalDragUpdate = onThreeFingerDragUpdate
+          ..onThreeFingerVerticalDragEnd = onThreeFingerDragEnd;
       }),
     };
   }
