@@ -615,28 +615,31 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
   // also treated as remote pointer input.
   Widget _withIrisKeyboard(Widget page) {
     if (!isIOS) return page;
-    _syncIrisKeyboardHeight(context);
-    if (!_irisKb) return page;
-    return Stack(fit: StackFit.expand, children: [
-      page,
-      Positioned(
-        left: 0,
-        right: 0,
-        bottom: 0,
-        child: IrisKeyboard(
-          inputModel: inputModel,
-          bottomPad: MediaQuery.of(context).padding.bottom,
-          onHide: () => setState(() => _irisKb = false),
+    // The body is shorter than the screen while the bottom bar is shown; the
+    // bar then also covers the safe area, so the keyboard needs no padding.
+    return LayoutBuilder(builder: (context, constraints) {
+      final mq = MediaQuery.of(context);
+      final barH = (mq.size.height - constraints.maxHeight).clamp(0.0, 400.0).toDouble();
+      final pad = barH > 0 ? 0.0 : mq.padding.bottom;
+      final kbH = _irisKb ? irisKeyboardHeight(mq.size, pad) : 0.0;
+      _syncIrisKeyboardHeight(kbH + barH);
+      if (!_irisKb) return page;
+      return Stack(fit: StackFit.expand, children: [
+        page,
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: IrisKeyboard(inputModel: inputModel, bottomPad: pad),
         ),
-      ),
-    ]);
+      ]);
+    });
   }
 
-  // The remote screen is fitted into the space above the Iris keyboard. The
-  // height depends on the orientation, so it is checked on every build.
-  void _syncIrisKeyboardHeight(BuildContext context) {
-    final mq = MediaQuery.of(context);
-    final h = _irisKb ? irisKeyboardHeight(mq.size, mq.padding.bottom) : 0.0;
+  // The remote screen is fitted into the space above the Iris keyboard and the
+  // bottom bar (the bar used to cover the bottom of the screen). The heights
+  // change with the orientation and the bar, so this runs on every build.
+  void _syncIrisKeyboardHeight(double h) {
     if (gFFI.canvasModel.irisKeyboardHeight == h) return;
     gFFI.canvasModel.irisKeyboardHeight = h;
     WidgetsBinding.instance

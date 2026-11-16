@@ -157,15 +157,11 @@ double _pitch(Size size) {
 
 class IrisKeyboard extends StatefulWidget {
   final InputModel inputModel;
-  final VoidCallback onHide;
-  // The page's bottom safe area. Passed in because inside the Scaffold body
-  // MediaQuery may already have it removed, and the canvas uses the page's.
+  // Bottom safe area to leave under the keys (0 while the bottom bar is shown).
+  // Passed in so the page and the keyboard use the same panel height.
   final double bottomPad;
   const IrisKeyboard(
-      {Key? key,
-      required this.inputModel,
-      required this.onHide,
-      required this.bottomPad})
+      {Key? key, required this.inputModel, required this.bottomPad})
       : super(key: key);
 
   @override
@@ -327,20 +323,14 @@ class _IrisKeyboardState extends State<IrisKeyboard> {
         child: _key(i, col, fontSize),
       ));
     }
-    // Long press on the background (not on a key) hides the keyboard. The keys
-    // are above it in the Stack, so holding a layer key does not trigger it.
-    return Container(
-      height: height,
-      color: col.pad,
-      child: Stack(children: [
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onLongPress: widget.onHide,
-          ),
-        ),
-        ...keys,
-      ]),
+    // Opaque so touches between the keys do not reach the remote screen below.
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        height: height,
+        color: col.pad,
+        child: Stack(children: keys),
+      ),
     );
   }
 
@@ -349,7 +339,12 @@ class _IrisKeyboardState extends State<IrisKeyboard> {
     final layerAction = layerList == null ? null : layerList[i];
     final a = layerAction ?? _base[i]!;
     final dimmed = _layer != 0 && layerAction == null && _held != i;
-    final label = a.label;
+    // Letters are shown in lower case and in upper case while Shift is held,
+    // like the iPad keyboard (2026-11-16).
+    final shifted = _sent.values.any((h) => h.contains(_lshift));
+    final label = RegExp(r'^[A-Z]$').hasMatch(a.label) && !shifted
+        ? a.label.toLowerCase()
+        : a.label;
     final isMod = label != 'Space' &&
         (label.runes.length > 1 || '←↑↓→'.contains(label));
     final down = _down.contains(i);
